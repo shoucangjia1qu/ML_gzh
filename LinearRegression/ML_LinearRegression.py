@@ -148,11 +148,11 @@ def multivariateLR():
     #矩阵法求解
     lr1 = LinearRegression()
     lr1.train(X, y, method='Matrix')
-    print("【formula方法】\nw:{}, b:{}, square loss:{}".format(lr1.w, lr1.b, lr1.sqrLoss))
+    print("【matrix方法】\nw:{}, b:{}, square loss:{}".format(lr1.w, lr1.b, lr1.sqrLoss))
     #梯度下降法求解
     lr2 = LinearRegression()
     lr2.train(X, y, method='Gradient', learning_rate=0.1, n_iters=5000)
-    print("【matrix方法】\nw:{}, b:{}, square loss:{}".format(lr2.w, lr2.b, lr2.sqrLoss))
+    print("【gradient方法】\nw:{}, b:{}, square loss:{}".format(lr2.w, lr2.b, lr2.sqrLoss))
     #画梯度下降的误差下降图
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
