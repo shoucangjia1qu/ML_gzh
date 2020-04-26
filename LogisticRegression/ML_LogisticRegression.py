@@ -44,8 +44,8 @@ class LogisticRegressionSelf(object):
             截距
         accurancy: float
             准确率，根据模型优化后自动生成的准确率
-        lossList: List[float]
-            记录每轮迭代的平方损失和列表
+        llList: List[float]
+            记录每轮迭代的似然值列表
         """
         if X.ndim < 2:
             raise ValueError("X must be 2D array-like!")
@@ -80,8 +80,18 @@ class LogisticRegressionSelf(object):
             似然值
         """
         wx = np.dot(X, W.T)
-        p_value = np.exp(wx) / (1 + np.exp(wx))
-        LLarray = -1.*np.multiply(Y, wx) + np.log(1 + np.exp(wx))
+        #为了防止wx过大导致值溢出,统一使大于0的值变成-1，并转换下公式，相当于正值用一个公式，负值用一个公式
+        #原式：
+        #p_value = np.exp(wx) / (1 + np.exp(wx))
+        p_value = np.zeros(wx.shape)
+        p_value[wx<0] = np.exp(wx[wx<0]) / (1 + np.exp(wx[wx<0]))
+        p_value[wx>=0] = 1 / (1 + np.exp(-1.*wx[wx>=0]))
+        #为了防止求解似然函数时溢出，进行公式转变
+        #原式：
+        ##LLarray = -1.*np.multiply(Y, wx) + np.log(1 + np.exp(wx))
+        LLarray = np.zeros(wx.shape)
+        LLarray[wx<0] = -1.*np.multiply(Y[wx<0], wx[wx<0]) + np.log(1 + np.exp(wx[wx<0]))
+        LLarray[wx>=0] = -1.*np.multiply(Y[wx>=0], wx[wx>=0]) + np.log(1 + np.exp(-1.*wx[wx>=0])) + wx[wx>=0]
         return p_value, LLarray.sum()
     
     #求梯度/一阶导矩阵
@@ -103,7 +113,7 @@ class LogisticRegressionSelf(object):
             梯度矩阵
         """
         Gw = -1.*np.multiply((Y - Ypre), X).sum(axis=0)
-        return Gw
+        return np.expand_dims(Gw, 0)
     
     #求海塞/二阶导矩阵
     def __calHessian(self, X, Ypre):
@@ -140,7 +150,7 @@ class LogisticRegressionSelf(object):
         Y = np.expand_dims(y, axis=1)
         #初始化特征系数W
         W = np.zeros((1, n_features+1))
-        #初始化误差，更新前后的误差之差，训练次数
+        #初始化似然值，更新前后的似然值之差，训练次数
         Ypreprob, LL0 = self.PVandLLV(X2, Y, W)
         self.llList.append(LL0)
         deltaLL = np.inf
@@ -175,7 +185,7 @@ class LogisticRegressionSelf(object):
         Y = np.expand_dims(y, axis=1)
         #初始化特征系数W
         W = np.zeros((1, n_features+1))
-        #初始化误差，更新前后的误差之差，训练次数
+        #初始化似然值，更新前后的似然值之差，训练次数
         Ypreprob, LL0 = self.PVandLLV(X2, Y, W)
         self.llList.append(LL0)
         deltaLL = np.inf
@@ -183,6 +193,8 @@ class LogisticRegressionSelf(object):
         while (n<n_iters) and (LL0>self.tol) and (abs(deltaLL)>self.tol):
             Gw = self.__calGradient(X2, Y, Ypreprob)
             Hw = self.__calHessian(X2, Ypreprob)
+            self.H=[]
+            self.H.append(Hw)
             W = W - np.dot(Gw, np.linalg.pinv(Hw))
             #计算更新后的误差，并留下来
             Ypreprob, LL1 = self.PVandLLV(X2, Y, W)
@@ -199,12 +211,13 @@ class LogisticRegressionSelf(object):
         print("w:{};\nb:{}".format(self.w, self.b))
         return
 
+#%%
 if __name__ == "__main__":
     from sklearn.datasets import make_classification
-    X, y = make_classification(n_samples=1000, n_features=10)
+    X, y = make_classification(n_samples=1000, n_features=5)
     #自编的梯度下降法进行拟合
     logit_gd = LogisticRegressionSelf()
-    logit_gd.train(X, y, method="gradient", n_iters=20000, learning_rate=0.3)
+    logit_gd.train(X, y, method="gradient", n_iters=2000, learning_rate=0.3)
     plt.plot(range(logit_gd.n_iters+1), logit_gd.llList)
     plt.show()
     #自编的牛顿法进行拟合
