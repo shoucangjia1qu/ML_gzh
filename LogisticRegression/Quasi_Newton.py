@@ -143,10 +143,10 @@ if __name__ == "__main__":
     import time
     X, y = make_classification(n_samples=1000, n_features=4)
     #1、自编的梯度下降法进行拟合
-    logit_gd = allLogitMethod("gradient")
-    logit_gd.train(X, y, n_iters=20000, learning_rate=0.3)
-    plt.plot(range(logit_gd.n_iters+1), logit_gd.llList)
-    plt.show()
+    #logit_gd = allLogitMethod("gradient")
+    #logit_gd.train(X, y, n_iters=20000, learning_rate=0.3)
+    #plt.plot(range(logit_gd.n_iters+1), logit_gd.llList)
+    #plt.show()
     #2、自编的牛顿法进行拟合
     time_nt = time.time()
     logit_nt = allLogitMethod("newton")
@@ -166,11 +166,11 @@ if __name__ == "__main__":
     ax2.plot(range(logit_dfp.n_iters+1), logit_dfp.graList)
     plt.show()
     #4、sklearn封装的逻辑回归进行拟合
-    from sklearn.linear_model import LogisticRegression
-    logit_sklearn = LogisticRegression(solver="saga")
-    logit_sklearn.fit(X, y)
-    print("w:{};\nb:{}".format(logit_sklearn.coef_, logit_sklearn.intercept_))
-    print("score:",logit_sklearn.score(X, y))
+    #from sklearn.linear_model import LogisticRegression
+    #logit_sklearn = LogisticRegression(solver="saga")
+    #logit_sklearn.fit(X, y)
+    #print("w:{};\nb:{}".format(logit_sklearn.coef_, logit_sklearn.intercept_))
+    #print("score:",logit_sklearn.score(X, y))
     
     
     
