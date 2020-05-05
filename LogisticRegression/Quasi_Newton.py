@@ -60,6 +60,8 @@ class allLogitMethod(logit):
             self._LogisticRegressionSelf__train_newton(n_iters)
         elif self.method.lower() == "dfp":
             self.__train_dfp(n_iters, learning_rate)
+        elif self.method.lower() == "bfgs":
+            self.__train_bfgs(n_iters, learning_rate)
         else:
             raise ValueError("method value not found!")
         return  
@@ -136,12 +138,61 @@ class allLogitMethod(logit):
         print("w:{};\nb:{}".format(self.w, self.b))
         return
 
+    #新增拟牛顿法-BFGS优化算法
+    def __train_bfgs(self, n_iters, learning_rate):
+        n_samples, n_features = self.trainSet.shape
+        X = self.trainSet
+        y = self.label
+        #合并w和b，在X尾部添加一列全是1的特征
+        X2 = np.hstack((X, np.ones((n_samples, 1))))
+        #将y转置变为(n_samples,1)的矩阵
+        Y = np.expand_dims(y, axis=1)
+        #初始化特征系数W，初始化替代对称矩阵
+        W = np.zeros((1, n_features+1))
+        Bk0 = np.eye(n_features+1)
+        #计算初始的预测值、似然值，并记录似然值
+        Ypreprob, LL0 = self.PVandLLV(X2, Y, W)
+        self.llList.append(LL0)
+        #根据初始的预测值计算初始梯度，并记录梯度的模长
+        Gk0 = self._LogisticRegressionSelf__calGradient(X2, Y, Ypreprob)
+        graLength = np.linalg.norm(Gk0)
+        self.graList.append(graLength)
+        #初始化迭代次数
+        k = 0
+        while (k<n_iters) and (graLength>self.tol):
+            #计算优化方向的值Pk=Gk0.Bk0
+            Pk = np.dot(Gk0, Bk0)
+            #一维搜索更新参数，并保存求得的最小似然值
+            W, deltaW, min_LLvalue, Ypreprob = self.__updateW(X2, Y, learning_rate, W, Pk)
+            self.llList.append(min_LLvalue)
+            #更新梯度Gk和deltaG，同时求得梯度的模长和更新前后的模长差值
+            Gk1 = self._LogisticRegressionSelf__calGradient(X2, Y, Ypreprob)
+            graLength = np.linalg.norm(Gk1)
+            self.graList.append(graLength)
+            deltaG = Gk1 - Gk0
+            Gk0 = Gk1
+            #更新替代矩阵Bk
+            temp = (np.eye(n_features+1)-np.dot(deltaW.T,deltaG)/np.dot(deltaW,deltaG.T))
+            Bk1 = np.dot(np.dot(temp, Bk0), temp.T) + np.dot(deltaW.T, deltaW)/np.dot(deltaW, deltaG.T)
+            Bk0 = Bk1
+            k += 1
+        self.n_iters = k
+        self.w = W.flatten()[:-1]
+        self.b = W.flatten()[-1]
+        Ypre = np.argmax(np.column_stack((1-Ypreprob,Ypreprob)), axis=1)
+        self.accurancy = sum(Ypre==y)/n_samples
+        print("第{}次停止迭代，梯度模长为{}，似然值为{}，准确率为{}".format(self.n_iters, self.graList[-1], self.llList[-1], self.accurancy))
+        print("w:{};\nb:{}".format(self.w, self.b))
+        return
+
+
+
 #%%            
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from sklearn.datasets import make_classification
     import time
-    X, y = make_classification(n_samples=1000, n_features=4)
+    X, y = make_classification(n_samples=1000, n_features=5)
     #1、自编的梯度下降法进行拟合
     #logit_gd = allLogitMethod("gradient")
     #logit_gd.train(X, y, n_iters=20000, learning_rate=0.3)
@@ -154,7 +205,8 @@ if __name__ == "__main__":
     print("迭代时长：", time.time()-time_nt)
     plt.plot(range(logit_nt.n_iters+1), logit_nt.llList)
     plt.show()
-    #3、自编的拟牛顿法-DFP算法进行拟合
+    
+    #3-1、自编的拟牛顿法-DFP算法进行拟合
     time_dfp = time.time()
     logit_dfp = allLogitMethod("DFP")
     logit_dfp.train(X, y, n_iters=20, learning_rate=0.5)
@@ -165,13 +217,25 @@ if __name__ == "__main__":
     ax2 = fig.add_subplot(1,2,2)
     ax2.plot(range(logit_dfp.n_iters+1), logit_dfp.graList)
     plt.show()
+    
+    #3-2、自编的拟牛顿法-BFGS算法进行拟合
+    time_bfgs = time.time()
+    logit_bfgs = allLogitMethod("bfgs")
+    logit_bfgs.train(X, y, n_iters=20, learning_rate=0.5)
+    print("迭代时长：", time.time()-time_bfgs)
+    fig = plt.figure(figsize=(12,4)) 
+    ax1 = fig.add_subplot(1,2,1)
+    ax1.plot(range(logit_bfgs.n_iters+1), logit_bfgs.llList)
+    ax2 = fig.add_subplot(1,2,2)
+    ax2.plot(range(logit_bfgs.n_iters+1), logit_bfgs.graList)
+    plt.show()
+
     #4、sklearn封装的逻辑回归进行拟合
     #from sklearn.linear_model import LogisticRegression
     #logit_sklearn = LogisticRegression(solver="saga")
     #logit_sklearn.fit(X, y)
     #print("w:{};\nb:{}".format(logit_sklearn.coef_, logit_sklearn.intercept_))
     #print("score:",logit_sklearn.score(X, y))
-    
     
     
     
