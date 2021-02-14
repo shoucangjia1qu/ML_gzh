@@ -5,7 +5,8 @@ Created on Sat Oct 31 13:23:31 2020
 @author: ecupl
 """
 
-from ML_NaiveBayes import NBayes 
+from ML_NaiveBayes import NBayes
+from Semi_NaiveBayes import *
 import numpy as np
 
 
@@ -19,7 +20,7 @@ class Bayes(NBayes):
         Parameters
         ----------
         algorithm : String, optional
-            选择的贝叶斯方法，默认是Naive，可选择
+            选择的贝叶斯方法，默认是Naive，可选择AODE
         solver : String, optional
             选择的概率密度函数，默认是Gaussian，可选择
 
@@ -34,11 +35,39 @@ class Bayes(NBayes):
     def train(self, X, y, columnsMark):
         if self.algorithm == "Naive":
             self.NaiveTrain(X, y, columnsMark)
-        elif:
-            pass
+        elif self.algorithm == "Aode":
+            self.aode = Aode()
+            self.aode.AodeTrain(X, y, columnsMark)
+            self.yProba = self.aode.yProba
+            self.xyProba = self.aode.xyProba
+            self.trainSet = X
+            self.trainLabel = y
+            self.columnsMark = columnsMark 
         else:
             pass
     
+    
+    #预测
+    def predict(self, X):
+        if self.algorithm == "Naive":
+            proba = self.naivepredict(X)
+        elif self.algorithm == "Aode":
+            proba = self.aode.aodepredict(X, 0)
+        else:
+            pass
+        return proba
+    
+    
+    #取对数预测
+    def predictLog(self, X):
+        if self.algorithm == "Naive":
+            proba_log = self.naivepredictLog(X)
+        elif self.algorithm == "Aode":
+            proba_log = self.aode.aodepredictLog(X, 0)
+        else:
+            pass
+        return proba_log
+        
     
     #朴素贝叶斯训练参数
     def NaiveTrain(self, X, y, columnsMark):
@@ -173,7 +202,7 @@ class Bayes(NBayes):
         return Pxy
     
     
-    def predict(self, X):
+    def naivepredict(self, X):
         m, n = X.shape
         proba = np.zeros((m, len(self.yProba)))
         for i in range(m):
@@ -190,7 +219,7 @@ class Bayes(NBayes):
 
 
     #防止值溢出，预测时取对数
-    def predictLog(self, X):
+    def naivepredictLog(self, X):
         m, n = X.shape
         log_proba = np.zeros((m, len(self.yProba)))
         for i in range(m):
@@ -242,18 +271,20 @@ if __name__ == "__main__":
     y[y=="坏瓜"]=0
     y=y.astype(float)
 
-    #训练
-    Bs = Bayes()
+
+    #训练0, Naive算法训练
+    Bs = Bayes(algorithm='Naive')
     Bs.train(X, y, [0, 0, 0, 0, 0, 0, 1, 1])
     Proba = Bs.predict(X)
     logProba = Bs.predictLog(X)
     yPredict = np.argmax(logProba, axis=1)
-    #打印先验概率
-    print(Bs.yProba)
-    #打印每个特征的条件概率
-    for i in range(X.shape[1]):
-        print(f"\n特征{i}")
-        for j in Bs.yProba.keys():
-            print(f"分类为{j}：")
-            print(Bs.xyProba[i][j])
+    print(f"错误{sum(yPredict!=y)}个，准确率为：{sum(yPredict==y)/y.size}")
 
+    #训练1, Aode算法训练
+    Bs = Bayes(algorithm='Aode')
+    Bs.train(X, y, [0, 0, 0, 0, 0, 0, 1, 1])
+    Proba = Bs.predict(X)
+    logProba = Bs.predictLog(X)
+    yPredict = np.argmax(logProba, axis=1)
+    print(f"错误{sum(yPredict!=y)}个，准确率为：{sum(yPredict==y)/y.size}")
+    
