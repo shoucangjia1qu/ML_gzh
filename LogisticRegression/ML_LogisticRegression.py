@@ -131,12 +131,7 @@ class LogisticRegressionSelf(object):
         Hw: array, shape=(n_features+1, n_features+1)
             海塞矩阵
         """
-        Hw = np.dot(np.dot(X.T, np.dot(np.diag(Ypre.reshape(-1)), np.diag(1-Ypre.reshape(-1)))), X)
-        #为了更直观的理解，展示下拆解开求解的方法
-        #Hw = np.zeros((X.shape[1], X.shape[1]))
-        #for i in range(n_samples):
-        #    xxt = np.dot(X[i,:].reshape(-1,1),X[i,:].reshape(1,-1))
-        #    Hw += xxt*Ypre[i]*(1-Ypre[i])
+        Hw = X.T@(X*Ypre*(1-Ypre))
         return Hw
         
     #训练，梯度下降法
