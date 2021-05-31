@@ -20,7 +20,7 @@ class Bayes(NBayes):
         Parameters
         ----------
         algorithm : String, optional
-            选择的贝叶斯方法，默认是Naive，可选择AODE
+            选择的贝叶斯方法，默认是Naive，可选择AODE, TAN
         solver : String, optional
             选择的概率密度函数，默认是Gaussian，可选择
 
@@ -43,6 +43,15 @@ class Bayes(NBayes):
             self.trainSet = X
             self.trainLabel = y
             self.columnsMark = columnsMark 
+        elif self.algorithm == "Tan":
+            self.tan = Tan()
+            self.tan.TanTrain(X, y, columnsMark)
+            self.yProba = self.tan.yProba
+            self.xyProba = self.tan.xyProba
+            self.trainSet = X
+            self.trainLabel = y
+            self.columnsMark = columnsMark 
+
         else:
             pass
     
@@ -53,6 +62,8 @@ class Bayes(NBayes):
             proba = self.naivepredict(X)
         elif self.algorithm == "Aode":
             proba = self.aode.aodepredict(X, 0)
+        elif self.algorithm == "Tan":
+            proba = self.tan.tanpredict(X)
         else:
             pass
         return proba
@@ -64,6 +75,8 @@ class Bayes(NBayes):
             proba_log = self.naivepredictLog(X)
         elif self.algorithm == "Aode":
             proba_log = self.aode.aodepredictLog(X, 0)
+        elif self.algorithm == "Tan":
+            proba_log = self.tan.tanpredictLog(X)
         else:
             pass
         return proba_log
@@ -288,3 +301,10 @@ if __name__ == "__main__":
     yPredict = np.argmax(logProba, axis=1)
     print(f"错误{sum(yPredict!=y)}个，准确率为：{sum(yPredict==y)/y.size}")
     
+    #训练1, Tan算法训练
+    Bs = Bayes(algorithm='Tan')
+    Bs.train(X, y, [0, 0, 0, 0, 0, 0, 1, 1])
+    Proba = Bs.predict(X)
+    logProba = Bs.predictLog(X)
+    yPredict = np.argmax(logProba, axis=1)
+    print(f"错误{sum(yPredict!=y)}个，准确率为：{sum(yPredict==y)/y.size}")
