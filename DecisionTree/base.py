@@ -78,9 +78,9 @@ class BaseTree(object):
             node = TreeNode(None, None, node_value, node_depth, n_samples, None)
             return node
 
-        # 不停止划分的话，另child_node为字典：
+        # 不停止划分的话，令child_node为字典：
         child_node = {}
-        ## 1.找到树的最优特征和划分方法
+        ## 1.找到树的最优特征和划分方法  
         best_feature, thres_list = self._search_feature_method(X, y, column_indicator)
         ## 2.遍历保存树的子结点
         for thres in thres_list:

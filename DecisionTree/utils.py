@@ -65,3 +65,74 @@ def ent_gainratio_continuous(xarray, yarray):
 
 
 
+# 计算GINI指数
+def calculate_gini(y):
+    if len(y)==0:
+        return 0
+    ycount = len(y)
+    yset, yicount = np.unique(y, return_counts=True)
+    # 二分类用简化算法
+    if len(yset)==2:
+        gini = 2*yicount[0]*(ycount-yicount[0])/ycount**2
+    else:
+        gini = ycount**2
+        for i in yicount:
+            gini -= i**2
+        gini = gini/ycount**2
+    return gini
+
+
+
+# 计算同一个特征中最优划分点的条件基尼指数__分类变量
+def gini_cutoff_categorical(xarray, yarray):
+    n_samples = len(yarray)
+    xSet = np.unique(xarray)
+    best_gini = 1.0
+    best_feature_value = None
+    for xi in xSet:
+        # 计算xi为切分点时的基尼指数
+        y_left = yarray[xarray==xi]
+        gini_left = calculate_gini(y_left)
+        # print(y_left.__len__(), gini_left)
+        y_right = yarray[xarray!=xi]
+        gini_right = calculate_gini(y_right)
+        # print(y_right.__len__(), gini_right)
+        gini = (len(y_left)*gini_left + len(y_right)*gini_right)/n_samples
+        # print(xi, n_samples, gini)
+        if gini < best_gini:
+            best_gini = gini
+            best_feature_value = xi
+    return best_gini, [(best_feature_value, 'left'), (best_feature_value, 'right')]
+
+
+
+# 计算同一个特征中最优划分点的条件基尼指数__连续变量
+def gini_cutoff_continuous(xarray, yarray):
+    n_samples = len(yarray)
+    xSet = np.unique(xarray)
+    best_gini = 1.0
+    best_feature_value = None
+    for xi in xSet:
+        # 计算xi为切分点时的基尼指数
+        y_left = yarray[xarray<=xi]
+        gini_left = calculate_gini(y_left)
+        y_right = yarray[xarray>xi]
+        gini_right = calculate_gini(y_right)
+        gini = (len(y_left)*gini_left + len(y_right)*gini_right)/n_samples
+        if gini < best_gini:
+            best_gini = gini
+            best_feature_value = xi
+    return best_gini, [(best_feature_value, 'left'), (best_feature_value, 'right')]
+
+
+
+
+
+
+
+
+
+
+
+
+
