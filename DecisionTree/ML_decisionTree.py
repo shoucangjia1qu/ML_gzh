@@ -1,45 +1,50 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Feb 20 22:19:40 2022
+Created on Sat Mar 26 23:22:41 2022
 
 @author: ecupl
 """
 
 
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jun 29 22:40:19 2021
-
-@author: ecupl
-"""
 
 
 import numpy as np
-from utils import calculate_entropy, calculate_gini, calculate_mse, calculate_yproba, calculate_mean
-from best_split_classfier import ent_cutoff_categorical, ent_cutoff_continuous, gini_cutoff_categorical, gini_cutoff_continuous
-from best_split_regressor import mse_cutoff_categorical, mse_cutoff_continuous
-from base import BaseTree
+from tools.utils import calculate_yproba, calculate_mean, CAL_CRITERION
+from DecisionTree.search_feature import SEARCH_FEATURE
+from DecisionTree.split_data import SPLIT_DATA
+from DecisionTree.analyse_tree import ANALYSE_TREE
+from DecisionTree.base import BaseTree
 
 # from sklearn.tree import DecisionTreeClassifier
 # 分类树
-class DecisionTreeClassifier(BaseTree):
-    def __init__(self, criterion, minloss):
+
+
+
+__all__ = ['DecisionTreeClassication', 'DecisionTreeRegression']
+
+class DecisionTreeClassication(BaseTree):
+    def __init__(self, criterion, max_depth, min_samples_leaf, min_criterion_value=0.0001):
         """
         分类树的方法类
 
         Parameters
         ----------
         criterion : String
-            分类树的准则，可选"entropy", "gini"，默认"entropy".
-        minloss : float
-            树停止生长的最小误差，分类树和回归树以及不同的准则会有不同的损失计算函数.
+            分类树的准则，可选"mse", "mae"，默认"mse".
+        max_depth : Int
+            最大树深
+        min_samples_leaf : Int
+            叶子结点最小样本数量
+        min_criterion_value : Float
+            指标停止划分的最小值.
 
         Returns
         -------
         None.
 
         """
-        super(DecisionTreeClassifier, self).__init__(criterion, minloss)
+        super(DecisionTreeClassication, self).__init__(criterion, max_depth, min_samples_leaf, min_criterion_value)
+        self._tree_predict_method = ANALYSE_TREE['classifer']
     
     
     def __search_feature_entropy(self, X, y, column_indicator=None):
@@ -49,7 +54,7 @@ class DecisionTreeClassifier(BaseTree):
         bestsplit_feature_index = None
         bestsplit_value = None
         for idx in range(n_features):
-            if self.is_categorical.__len__() > 0 and self.is_categorical[column_indicator[idx]]==False:
+            if (self.is_categorical.__len__() > 0 and self.is_categorical[column_indicator[idx]]==False) or self.is_categorical.__len__() == 0:
                 # 连续特征求信息增益率
                 entropy_gainratio, feature_value = ent_cutoff_continuous(X[:, idx], y)
             else:
@@ -65,12 +70,12 @@ class DecisionTreeClassifier(BaseTree):
     def __split_dataset_entropy(self, X, y, best_feature, feature_thres, column_indicator):
         best_feature_idx = column_indicator.index(best_feature)
         newx, newy, newcolindicator = np.copy(X), np.copy(y), list(np.copy(column_indicator))
-        if self.is_categorical.__len__() > 0 and self.is_categorical[best_feature]==False:
+        if (self.is_categorical.__len__() > 0 and self.is_categorical[best_feature]==False) or self.is_categorical.__len__() == 0:
             # 连续特征拆解数据集
-            if feature_thres[1] == 'maximum':
+            if feature_thres[1] == 'left':
                 newx = newx[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0], :]
                 newy = newy[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0]]
-            elif feature_thres[1] == 'minimum':
+            elif feature_thres[1] == 'right':
                 newx = newx[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0], :]
                 newy = newy[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0]]
             else:
@@ -81,83 +86,27 @@ class DecisionTreeClassifier(BaseTree):
             newy = newy[np.nonzero(X[:,best_feature_idx]==feature_thres)[0]]
             newcolindicator.remove(best_feature)
         return newx, newy, newcolindicator
-
-    
-    def __search_feature_gini(self, X, y, column_indicator=None):
-        # 遍历特征，根据GINI指数最小化准则找到最优划分特征和切分点
-        n_samples, n_features = X.shape
-        best_gini = 1
-        bestsplit_feature_index = None
-        bestsplit_value = None
-        for idx in range(n_features):
-            if self.is_categorical.__len__() > 0 and self.is_categorical[column_indicator[idx]]==False:
-                # 连续特征求GINI指数
-                feature_gini, split_value = gini_cutoff_continuous(X[:, idx], y)
-            else:
-                # 分类特征求GINI指数
-                feature_gini, split_value = gini_cutoff_categorical(X[:, idx], y)
-            if feature_gini < best_gini:
-                best_gini = feature_gini
-                bestsplit_feature_index = idx
-                bestsplit_value = split_value
-        # print(column_indicator[bestsplit_feature_index], bestsplit_value)
-        return column_indicator[bestsplit_feature_index], bestsplit_value
-    
-    
-    def __split_dataset_gini(self, X, y, best_feature, feature_thres, column_indicator):
-        best_feature_idx = column_indicator.index(best_feature)
-        newx, newy, newcolindicator = np.copy(X), np.copy(y), list(np.copy(column_indicator))
-        if self.is_categorical.__len__() > 0 and self.is_categorical[best_feature]==False:
-            # 连续特征拆解数据集
-            if feature_thres[1] == 'left':
-                newx = newx[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0]]
-            elif feature_thres[1] == 'right':
-                newx = newx[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0]]
-            else:
-                pass
-        else:
-            # 分类特征拆解数据集
-            if feature_thres[1] == 'left':
-                newx = newx[np.nonzero(X[:, best_feature_idx] == feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] == feature_thres[0])[0]]
-            elif feature_thres[1] == 'right':
-                newx = newx[np.nonzero(X[:, best_feature_idx] != feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] != feature_thres[0])[0]]
-            else:
-                pass
-        return newx, newy, newcolindicator
     
     
     def fit(self, X, y, is_categorical:list=[]):
-        # 赋值训练要用到的通用方法
+        # 计算结点值的函数，用均值来表示
         self._calculate_nodevalue_method = calculate_yproba
-        # 赋值信息熵方法
-        if self.criterion == "entropy":
-            self._calculate_loss = calculate_entropy
-            self._search_feature_method = self.__search_feature_entropy
-            self._split_dataset_method = self.__split_dataset_entropy
-        elif self.criterion == "gini":
-            self._calculate_loss = calculate_gini
-            self._search_feature_method = self.__search_feature_gini
-            self._split_dataset_method = self.__split_dataset_gini
-        else:
-            pass
-        # 其他参数
-        self.is_categorical = is_categorical
-        # 构建树的参数
-        self.tree = self._build_tree(X, y, column_indicator=list(range(X.shape[1])))
+        # 计算指标值的函数
+        self._calculate_criterion_method = CAL_CRITERION[self.criterion]
+        # 搜索最优分裂特征和分裂点的函数
+        self._search_feature_method = SEARCH_FEATURE[self.criterion]
+        # 拆分数据集的函数
+        self._split_dataset_method = SPLIT_DATA[self.criterion]
+        # 训练
+        super(DecisionTreeClassication, self).fit(X, y, is_categorical)
+        return
         
-
-
-
 
 
 
 # 回归树
 class DecisionTreeRegression(BaseTree):
-    def __init__(self, criterion, minloss):
+    def __init__(self, criterion, max_depth, min_samples_leaf, min_criterion_value=0.0001):
         """
         回归树的方法类
 
@@ -165,100 +114,96 @@ class DecisionTreeRegression(BaseTree):
         ----------
         criterion : String
             分类树的准则，可选"mse", "mae"，默认"mse".
-        minloss : float
-            树停止生长的最小误差，分类树和回归树以及不同的准则会有不同的损失计算函数.
+        max_depth : Int
+            最大树深
+        min_samples_leaf : Int
+            叶子结点最小样本数量
+        min_criterion_value : Float
+            指标停止划分的最小值.
 
         Returns
         -------
         None.
 
         """
-        super(DecisionTreeRegression, self).__init__(criterion, minloss)
+        super(DecisionTreeRegression, self).__init__(criterion, max_depth, min_samples_leaf, min_criterion_value)
+        self._tree_predict_method = ANALYSE_TREE['regressor']
         
-
-    
-    def __search_feature_mse(self, X, y, column_indicator=None):
-        # 遍历特征，根据MSE最小化准则找到最优划分特征和切分点
-        n_samples, n_features = X.shape
-        best_mse = np.inf
-        bestsplit_feature_index = None
-        bestsplit_value = None
-        for idx in range(n_features):
-            if self.is_categorical.__len__() > 0 and self.is_categorical[column_indicator[idx]]==False:
-                # 连续特征求最优划分点和以及MSE
-                feature_mse, split_value = mse_cutoff_continuous(X[:, idx], y)
-            else:
-                # 分类特征求最优划分点和以及MSE
-                feature_mse, split_value = mse_cutoff_categorical(X[:, idx], y)
-            if feature_mse < best_mse:
-                best_mse = feature_mse
-                bestsplit_feature_index = idx
-                bestsplit_value = split_value
-        # print(column_indicator[bestsplit_feature_index], bestsplit_value)
-        return column_indicator[bestsplit_feature_index], bestsplit_value
-    
-    
-    
-    def __split_dataset_mse(self, X, y, best_feature, feature_thres, column_indicator):
-        best_feature_idx = column_indicator.index(best_feature)
-        newx, newy, newcolindicator = np.copy(X), np.copy(y), list(np.copy(column_indicator))
-        if self.is_categorical.__len__() > 0 and self.is_categorical[best_feature]==False:
-            # 连续特征拆解数据集
-            if feature_thres[1] == 'left':
-                newx = newx[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] <= feature_thres[0])[0]]
-            elif feature_thres[1] == 'right':
-                newx = newx[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] > feature_thres[0])[0]]
-            else:
-                pass
-        else:
-            # 分类特征拆解数据集
-            if feature_thres[1] == 'left':
-                newx = newx[np.nonzero(X[:, best_feature_idx] == feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] == feature_thres[0])[0]]
-            elif feature_thres[1] == 'right':
-                newx = newx[np.nonzero(X[:, best_feature_idx] != feature_thres[0])[0], :]
-                newy = newy[np.nonzero(X[:, best_feature_idx] != feature_thres[0])[0]]
-            else:
-                pass
-        return newx, newy, newcolindicator
-    
     
     def fit(self, X, y, is_categorical:list=[]):
-        # 赋值训练要用到的通用方法
+        # 计算结点值的函数，用均值来表示
         self._calculate_nodevalue_method = calculate_mean
-        # 赋值信息熵方法
-        if self.criterion == "mse":
-            self._calculate_loss = calculate_mse
-            self._search_feature_method = self.__search_feature_mse
-            self._split_dataset_method = self.__split_dataset_mse
-        else:
-            pass
-        # 其他参数
-        self.is_categorical = is_categorical
-        # 构建树的参数
-        self.tree = self._build_tree(X, y, column_indicator=list(range(X.shape[1])))
-        
+        # 计算指标值的函数
+        self._calculate_criterion_method = CAL_CRITERION[self.criterion]
+        # 搜索最优分裂特征和分裂点的函数
+        self._search_feature_method = SEARCH_FEATURE[self.criterion]
+        # 拆分数据集的函数
+        self._split_dataset_method = SPLIT_DATA[self.criterion]
+        # 训练
+        super(DecisionTreeRegression, self).fit(X, y, is_categorical)
+        return
+    
+    
+    def predict(self, X):
+        res = np.zeros(X.shape[0])
+        X_index = np.arange(X.shape[0])
+        self._tree_predict_method(X, self.tree, X_index, res, self.is_categorical, 'value')
+        return res
+    
+    
+    def apply(self, X):
+        res = np.zeros(X.shape[0])
+        X_index = np.arange(X.shape[0])
+        self._tree_predict_method(X, self.tree, X_index, res, self.is_categorical, 'node_id')
+        return res
+    
 
 
 
 
-
-def print_tree(tree, max_depth):
-    columns = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感', '密度', '含糖率']
+def print_tree(tree):
+    # columns = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感', '密度', '含糖率']
     print(f"========第{tree.depth}层========")
     print(f"该树的结点类型为{tree.value}")
-    if (tree.childNode is None) or (tree.depth>=max_depth):
+    print(f"该树的样本为{tree.n_samples}")
+    print(f"划分特征和值{tree.feature_i}, {tree.feature_thres}")
+    if tree.childNode is None:
         return
-    print(f"最优划分特征是{columns[tree.feature_i]}，划分值有{tree.feature_thres}")
+    # print(f"最优划分特征是{columns[tree.feature_i]}，划分值有{tree.feature_thres}")
     for i, node in tree.childNode.items():
         print(f"\n当子结点的属性值为{i}时：")
-        print_tree(node, max_depth)
+        print_tree(node)
+
 
 
 
 if __name__ == "__main__":
+    # 回归树测试
+    ## 波士顿房价数据训练
+    from sklearn.datasets import load_boston
+    X, y = load_boston(True)
+    ## 自编的回归树算法
+    rt = DecisionTreeRegression(criterion="mse", max_depth=5, min_samples_leaf=5)
+    rt.fit(X, y)
+    print_tree(rt.tree)
+    y_pred = rt.predict(X)
+    node_id = rt.apply(X)
+    ## sklearn的回归树算法
+    from sklearn.tree import DecisionTreeRegressor
+    skrt = DecisionTreeRegressor(criterion="mse", max_depth=5, min_samples_leaf=5)
+    skrt.fit(X, y)
+    split_features = skrt.tree_.feature
+    split_thres = skrt.tree_.threshold
+    node_samples = skrt.tree_.n_node_samples
+    node_value = skrt.tree_.value
+    left_tree_value = node_value[skrt.tree_.children_left]
+    right_tree_value = node_value[skrt.tree_.children_right]
+    sk_pred = skrt.predict(X)
+    sk_id = skrt.apply(X)
+    
+    
+    
+    
     # 一、数据准备
     # 数据集1
     X = np.array([[0,0,0,0,0,1,1,1,1,1,2,2,2,2,2],[0,0,1,1,0,0,0,1,0,0,0,0,1,1,0],[0,0,0,1,0,0,0,1,1,1,1,1,0,0,0],[0,1,1,0,0,0,1,1,2,2,2,1,1,2,0]]).T
@@ -301,27 +246,44 @@ if __name__ == "__main__":
     Ylabel=labelencode.transform(Y)       #得到切分后的数据
     labelencode.classes_                        #查看分类标签
     labelencode.inverse_transform(Ylabel)    #还原编码前数据
-    # 数据集3，回归树
-    X = np.arange(1, 11).reshape((-1,1))
-    y = np.array([5.56, 5.7, 5.91, 6.4, 6.8, 7.05, 8.9, 8.7, 9, 9.05])
     
     # 二、训练
     # C4.5对西瓜集数据分类
-    tree_c45_classifier = DecisionTreeClassifier(criterion="entropy", minloss=0.0001)
+    from sklearn.tree import DecisionTreeClassifier
+
+    tree_c45_classifier = DecisionTreeClassifier(criterion="entropy")
     tree_c45_classifier.fit(Xdata, Ylabel, [True, True, True, True, True, True, False, False])
     tree_c45_classifier.tree
-    print_tree(tree_c45_classifier.tree)
 
     # CART分类树
-    tree_cart_classifier = DecisionTreeClassifier(criterion="gini", minloss=0.0001)
-    tree_cart_classifier.fit(Xdata, Ylabel, [True, True, True, True, True, True, False, False])
-    tree_cart_classifier.tree
-    print_tree(tree_cart_classifier.tree)
+    from sklearn.datasets import load_breast_cancer
+    X, y = load_breast_cancer(True)
+    ct = DecisionTreeClassication(criterion="gini", max_depth=5, min_samples_leaf=5)
+    ct.fit(X, y, [])
+    print_tree(ct.tree)
     
-    # CART回归树
-    tree_cart_regressor = DecisionTreeRegression(criterion='mse', minloss=0.0001)
-    tree_cart_regressor.fit(X, y, [False])
-    tree_cart_regressor.tree
-    print_tree(tree_cart_regressor.tree, 2)
+    sk_gini = DecisionTreeClassifier(criterion="gini", max_depth=5, min_samples_leaf=5)
+    sk_gini.fit(X, y)
+    node_samples1 = sk_gini.tree_.n_node_samples
+    node_value1 = sk_gini.tree_.value
+    
+    
+  
+    
+    import pandas as pd
+    Xdata2 = pd.DataFrame(Xdata)
+    Xdata2.iloc[:,:6] = Xdata2.iloc[:,:6].astype(object)
+    
+    tree_cart_classifier = DecisionTreeClassication(criterion="gini", max_depth=3, min_samples_leaf=1)
+    tree_cart_classifier.fit(Xdata, Ylabel, [True, True, True, True, True, True, False, False])
+    print_tree(tree_cart_classifier.tree)  
+    
+    gini2 = DecisionTreeClassifier(criterion="gini", max_depth=3, min_samples_leaf=1)
+    gini2.fit(Xdata2, Ylabel)
+    node_samples2 = gini2.tree_.n_node_samples
+    node_value2 = gini2.tree_.value  
+    
+    
+    
     
     
