@@ -6,7 +6,7 @@ Created on Mon Mar 21 14:26:30 2022
 """
 
 import numpy as np
-from tools.loss_functions import LeastSquaresError, LeastAbsoluteError, HuberLossFunction
+from tools.loss_functions import LeastSquaresError, LeastAbsoluteError, HuberLossFunction, BinomialLog
 from DecisionTree import DecisionTreeRegression
 
 
@@ -14,8 +14,8 @@ LOSS_FUNCTIONS = {
     'ls': LeastSquaresError,
     'lad': LeastAbsoluteError,
     'huber': HuberLossFunction,
-    # 'quantile': QuantileLossFunction,
-    # 'deviance': None,  # for both, multinomial and binomial
+    'bianry_deviance': BinomialLog,
+    # 'multiple_deviance': MultinomialLog,
     # 'exponential': ExponentialLoss,
 }
 
@@ -38,7 +38,7 @@ class BaseGradientBoosting():
 
 
     def fit(self, X, y):
-        # 创建模型
+        self.n_classes_ = len(np.unique(y))
         self.trees_ = []
         # 分配相应的损失函数
         loss_function = LOSS_FUNCTIONS[self.loss]
@@ -89,8 +89,26 @@ class GBRegressionTree(BaseGradientBoosting):
                  criterion, max_depth, min_samples_leaf, min_criterion_value, alpha)
 
 
-            
 
+# 梯度分类树
+class GBClassficationTree(BaseGradientBoosting):
+    def __init__(self, loss='bianry_deviance', learning_rate=0.1, n_estimators=100, 
+                 criterion='mse', max_depth=3, min_samples_leaf=1, min_criterion_value=0.0001, alpha=0.9):
+        super(GBClassficationTree, self).__init__(loss, learning_rate, n_estimators, 
+                 criterion, max_depth, min_samples_leaf, min_criterion_value, alpha)
+        
+    def predict_proba(self, X):
+        y_prediction = super(GBClassficationTree, self).predict(X)
+        y_proba = self.loss_function_._raw_predict_proba(y_prediction)
+        return y_proba
+    
+    def predict(self, X):
+        y_prediction = super(GBClassficationTree, self).predict(X)
+        y_label = self.loss_function_._raw_predict_label(y_prediction)
+        return y_label
+    
+    
+    
 if __name__ == "__main__":
     # 回归树测试
     ## 波士顿房价数据训练
@@ -105,7 +123,7 @@ if __name__ == "__main__":
     # LS
     ## 自编的
     gbrt_ls = GBRegressionTree(loss='ls', n_estimators=100)
-    gbrt_ls.fit(train_X, train_y)
+    gbrt_ls.fit(train_X, train_y)A
     ypre_ls = gbrt_ls.predict(test_X)
     
     ## sklearn的
@@ -166,4 +184,45 @@ if __name__ == "__main__":
           f"R2:自己写的R2={round(r2_huber, 3)}, sklearn的R2={round(r2_sk_huber, 3)}\n", 
           f"MSE:自己写的MSE={round(loss_huber, 3)}, sklearn的MSE={round(loss_sk_huber, 3)}")
     
+
+
+    # 分类树测试
+    ## 自带乳腺癌数据
+    from sklearn.datasets import load_breast_cancer
+    from sklearn.ensemble import GradientBoostingClassifier
+    from sklearn.model_selection import train_test_split
+    from sklearn import metrics
+    from scipy.stats import ks_2samp
+    X, y = load_breast_cancer(True)
+    train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.3)
+    
+    # Binomial Deviance
+    ## 自编的
+    gbct_bianry = GBClassficationTree(loss='bianry_deviance', n_estimators=100)
+    gbct_bianry.fit(train_X, train_y)
+    yproba_binary = gbct_bianry.predict_proba(test_X)[:, 1]
+    ypre_bianry = gbct_bianry.predict(test_X)
+    
+    ## sklearn的
+    sk_gbct_binary = GradientBoostingClassifier(loss='deviance', learning_rate=0.1, n_estimators=100, 
+                 criterion='mse', max_depth=3, min_samples_leaf=1)
+    sk_gbct_binary.fit(train_X, train_y)
+    yproba_sk_binary = sk_gbct_binary.predict_proba(test_X)[:, 1]
+    ypre_sk_binary = sk_gbct_binary.predict(test_X)
+    
+    ## 对比效果
+    auc_binary = metrics.roc_auc_score(test_y, yproba_binary)
+    auc_sk_binary = metrics.roc_auc_score(test_y, yproba_sk_binary)
+    ks_binary = ks_2samp(yproba_binary[test_y == 1], yproba_binary[test_y != 1]).statistic
+    ks_sk_binary = ks_2samp(yproba_sk_binary[test_y == 1], yproba_sk_binary[test_y != 1]).statistic
+    acc_binary = metrics.accuracy_score(test_y, ypre_bianry)
+    acc_sk_binary = metrics.accuracy_score(test_y, ypre_sk_binary)
+    print("Binomial Log-Likelihood损失函数效果对比：\n", 
+          f"AUC:自己写的AUC={round(auc_binary, 3)}, sklearn的AUC={round(auc_sk_binary, 3)}\n", 
+          f"KS:自己写的KS={round(ks_binary, 3)}, sklearn的KS={round(ks_sk_binary, 3)}\n",
+          f"Accuracy:自己写的Accuracy={round(acc_binary, 3)}, sklearn的Accuracy={round(acc_sk_binary, 3)}\n")
+
+
+
+
     
