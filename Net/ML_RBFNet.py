@@ -8,7 +8,6 @@ Created on Sun Jul 12 19:15:20 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 
 class RBFnetwork(object):
@@ -63,7 +62,7 @@ class RBFnetwork(object):
         return newX
     
     #训练
-    def train(self, X, y, iters):
+    def train(self, X, y, iters, draw=100):
         self.X = X
         self.y = y.reshape(-1,1)
         self.n_samples, self.n_features = X.shape
@@ -84,16 +83,27 @@ class RBFnetwork(object):
                         (yi_output-y)), w[:-1]), sigma**3)  #(h,m)x(m,1)
             sigma -= self.r['sigma']*deltasigma/self.n_samples
             deltac1 = np.divide(w[:-1],sigma**2)            #(h,1)
-            deltac2 = np.zeros((1,n))                       #(1,n)
-            for j in range(m):
+            deltac2 = np.zeros((1,self.n_features))                       #(1,n)
+            for j in range(self.n_samples):
                 deltac2 += (yi_output-y)[j]*np.dot(hi_output[j], X[j]-c)
             deltac = np.dot(deltac1,deltac2)                #(h,1)x(1,n)
             c -= self.r['c']*deltac/self.n_samples
+            # 拟合过程画图
+            if (draw!=0) and ((i+1)%draw==0):
+                self.draw_process(X, y, yi_output)
+                
         self.c = c
         self.w = w
         self.sigma = sigma
         self.n_iters = i
+    
+    # 画图
+    def draw_process(self, X, y, y_prediction):
+        plt.scatter(X, y)
+        plt.plot(X, y_prediction,c='r')
+        plt.show()
         
+    
     #预测
     def predict(self, X):
         hi_output = self.change(self.sigma,X,self.c)    #隐含层输出(m,h)，即通过径向基函数的转换
@@ -108,7 +118,6 @@ if __name__ == "__main__":
     X = np.linspace(-5, 5 , 500)[:, np.newaxis]
     y = np.multiply(1.1*(1-X+2*X**2),np.exp(-0.5*X**2))
     rbf = RBFnetwork(50, 0.1, 0.2, 0.1)
-    rbf.train(X, y, 1000)a
-    
-    
+    rbf.train(X, y, 1000, draw=50)
+
     
