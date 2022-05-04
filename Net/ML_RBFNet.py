@@ -62,7 +62,7 @@ class RBFnetwork(object):
         return newX
     
     #训练
-    def train(self, X, y, iters, draw=100):
+    def train(self, X, y, iters, draw=0):
         self.X = X
         self.y = y.reshape(-1,1)
         self.n_samples, self.n_features = X.shape

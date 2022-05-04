@@ -13,12 +13,34 @@ class LossFunction(object):
         pass
     
     def __call__(self, y, y_prediction):
+        """
+        calculate loss.
+        
+        Parameters
+        ----------
+        y : 2D-array
+            DESCRIPTION.
+        y_prediction : 2D-array
+            DESCRIPTION.
+        """
         pass
     
-    def negative_gradient(self, y, y_prediction):
+    def negative_gradient(self, y, y_prediction, **kwargs):
+        """
+        calculate negative-gradient.
+
+        Parameters
+        ----------
+        y : 1D-array
+            DESCRIPTION.
+        y_prediction : 2D-array
+            DESCRIPTION.
+        **kwargs : TYPE
+            DESCRIPTION.
+        """
         pass
     
-    def update_terminal_regions(self, tree, terminal_samples_nodeid, X, y, y_prediction):
+    def update_terminal_regions(self, tree, terminal_samples_nodeid, X, y, y_prediction, **kwargs):
         """update terminal regions"""
         if not tree.childNode:
             terminal_leaf = tree.node_id
@@ -36,13 +58,13 @@ class LeastSquaresError(LossFunction):
     
     def __call__(self, y, y_prediction):
         """Compute the least square loss."""
-        return np.mean((y - y_prediction.ravel()) ** 2)
+        return np.mean((y.ravel() - y_prediction.ravel()) ** 2)
     
-    def negative_gradient(self, y, y_prediction):
+    def negative_gradient(self, y, y_prediction, **kwargs):
         """Compute the negative gradient."""
         return y - y_prediction.ravel()
     
-    def update_terminal_regions(self, tree, terminal_samples_nodeid, X, y, y_prediction):
+    def update_terminal_regions(self, tree, terminal_samples_nodeid, X, y, y_prediction, **kwargs):
         """LS do not need update terminal regions, so change this function"""
         pass
         
@@ -52,15 +74,15 @@ class LeastAbsoluteError(LossFunction):
     
     def __call__(self, y, y_prediction):
         """Compute the least absolute loss."""
-        return np.abs(y - y_prediction.ravel()).mean()
+        return np.abs(y.ravel() - y_prediction.ravel()).mean()
     
-    def negative_gradient(self, y, y_prediction):
+    def negative_gradient(self, y, y_prediction, **kwargs):
         """Compute the negative gradient."""
         return 2 * ((y - y_prediction.ravel()) > 0) - 1
        
     def _update_terminal_node(self, terminal_samples_nodeid, terminal_leaf, X, y, y_prediction):
         terminal_region_index = np.where(terminal_samples_nodeid == terminal_leaf)[0]
-        diff = (y.take(terminal_region_index, axis=0) - y_prediction.take(terminal_region_index, axis=0))
+        diff = (y.take(terminal_region_index, axis=0) - y_prediction.ravel().take(terminal_region_index, axis=0))
         return np.median(diff)
         
 
@@ -74,7 +96,7 @@ class HuberLossFunction(LossFunction):
     def __call__(self, y, y_prediction):
         """Compute the huber loss."""
         # 先求出区分异常点的值
-        diff = y-y_prediction
+        diff = y.ravel() - y_prediction.ravel()
         if not self.gamma:
             gamma = np.percentile(np.abs(diff), self.alpha * 100)
         else:
@@ -85,9 +107,9 @@ class HuberLossFunction(LossFunction):
         loss = (square_loss + abs_loss) / y.shape[0]
         return loss
     
-    def negative_gradient(self, y, y_prediction):
+    def negative_gradient(self, y, y_prediction, **kwargs):
         """Compute the negative gradient."""
-        diff = y-y_prediction
+        diff = y-y_prediction.ravel()
         gamma = np.percentile(np.abs(diff), self.alpha * 100)
         normal_partern = np.abs(diff) <= gamma
         negative_gra = np.zeros(y.shape)
@@ -99,7 +121,7 @@ class HuberLossFunction(LossFunction):
     def _update_terminal_node(self, terminal_samples_nodeid, terminal_leaf, X, y, y_prediction):
         gamma = self.gamma
         terminal_region_index = np.where(terminal_samples_nodeid == terminal_leaf)[0]
-        diff = (y.take(terminal_region_index, axis=0) - y_prediction.take(terminal_region_index, axis=0))
+        diff = (y.take(terminal_region_index, axis=0) - y_prediction.ravel().take(terminal_region_index, axis=0))
         median_diff = np.median(diff)
         terminal_region_value = median_diff + np.mean(
             np.sign(diff-median_diff)*
@@ -112,11 +134,11 @@ class BinomialLog(LossFunction):
     """Binomial Log-Likelihood Loss Function """
         
     def __call__(self, y, y_prediction):
-        return -1 * np.mean((y * y_prediction) - np.logaddexp(0, y_prediction))
+        return -1 * np.mean((y.ravel() * y_prediction.ravel()) - np.logaddexp(0, y_prediction.ravel()))
     
-    def negative_gradient(self, y, y_prediction):
+    def negative_gradient(self, y, y_prediction, **kwargs):
         """Compute the negative gradient."""
-        return y - 1 / (1 + np.exp(-1*y_prediction))
+        return y - 1 / (1 + np.exp(-1*y_prediction.ravel()))
        
     def _update_terminal_node(self, terminal_samples_nodeid, terminal_leaf, X, y, y_prediction):
         """residual = y - y_prediction
@@ -125,14 +147,14 @@ class BinomialLog(LossFunction):
         """
         terminal_region_index = np.where(terminal_samples_nodeid == terminal_leaf)[0]
         yi = y.take(terminal_region_index, axis=0) 
-        yi_prediction = y_prediction.take(terminal_region_index, axis=0)
+        yi_prediction = y_prediction.ravel().take(terminal_region_index, axis=0)
         yi_residual = self.negative_gradient(yi, yi_prediction)
         terminal_region_value = np.sum(yi_residual) / np.sum((yi - yi_residual) * (1 - yi + yi_residual))
         return terminal_region_value
     
     def _raw_predict_proba(self, y_prediction):
         proba = np.ones((y_prediction.shape[0], 2), dtype=np.float64)
-        proba[:, 1] = 1 / (1 + np.exp(-1*y_prediction))
+        proba[:, 1] = 1 / (1 + np.exp(-1*y_prediction.ravel()))
         proba[:, 0] -= proba[:, 1]
         return proba
     
@@ -140,33 +162,53 @@ class BinomialLog(LossFunction):
         proba = self._raw_predict_proba(y_prediction)
         return np.argmax(proba, axis=1)
 
+    
+    
         
 class MultinomialLog(LossFunction):
     """Multinomial Log-Likelihood Loss Function """
-        
-    def __call__(self, y, y_prediction):
-        return -1 * np.mean((y * y_prediction) - np.logaddexp(0, y_prediction))
     
-    def negative_gradient(self, y, y_prediction):
+    def __init__(self, K):
+        self.K = K
+    
+    def __call__(self, y, y_prediction):
+        """
+        y : (n_samples, n_classes)
+        y_prediction : (n_samples, n_classes)
+
+        """
+        return np.mean(-1 * (y * y_prediction).sum(axis=1) + np.log(np.exp(y_prediction).sum(axis=1)))
+    
+    def negative_gradient(self, y, y_prediction, k=0, **kwargs):
         """Compute the negative gradient."""
-        return y - 1 / (1 + np.exp(-1*y_prediction))
+        return y - np.exp(y_prediction[:,k]) / np.exp(y_prediction).sum(axis=1)
        
-    def _update_terminal_node(self, terminal_samples_nodeid, terminal_leaf, X, y, y_prediction):
+    def update_terminal_regions(self, tree, terminal_samples_nodeid, X, y, y_prediction, k=0, **kwargs):
+        """update terminal regions"""
+        if not tree.childNode:
+            terminal_leaf = tree.node_id
+            tree.value = self._update_terminal_node(terminal_samples_nodeid, terminal_leaf, X, y, y_prediction, k=k)
+            return
+        for thres, childTree in tree.childNode.items():
+            self.update_terminal_regions(childTree, terminal_samples_nodeid, X, y, y_prediction, k=k)
+    
+    def _update_terminal_node(self, terminal_samples_nodeid, terminal_leaf, X, y, y_prediction, k=0):
         """residual = y - y_prediction
-            value = sum(y - prob) / sum(prob * (1 - prob))
-            value = sum(residual) / sum((y - residual) * (1 -y + residual))
+            v1 = (K-1)/K
+            value = (v1) * (sum(residual) / sum((y - residual) * (1 -y + residual)))
         """
         terminal_region_index = np.where(terminal_samples_nodeid == terminal_leaf)[0]
         yi = y.take(terminal_region_index, axis=0) 
         yi_prediction = y_prediction.take(terminal_region_index, axis=0)
-        yi_residual = self.negative_gradient(yi, yi_prediction)
-        terminal_region_value = np.sum(yi_residual) / np.sum((yi - yi_residual) * (1 - yi + yi_residual))
+        yi_residual = self.negative_gradient(yi, yi_prediction, k)
+        v1 = (self.K - 1) / self.K
+        terminal_region_value = v1 * np.sum(yi_residual) / np.sum((yi - yi_residual) * (1 - yi + yi_residual))
         return terminal_region_value
     
     def _raw_predict_proba(self, y_prediction):
-        proba = np.ones((y_prediction.shape[0], 2), dtype=np.float64)
-        proba[:, 1] = 1 / (1 + np.exp(-1*y_prediction))
-        proba[:, 0] -= proba[:, 1]
+        proba = np.zeros(y_prediction.shape)
+        for i in range(y_prediction.shape[1]):
+            proba[:, i] = np.exp(y_prediction[:,i]) / np.exp(y_prediction).sum(axis=1)
         return proba
     
     def _raw_predict_label(self, y_prediction):
